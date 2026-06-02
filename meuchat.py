@@ -165,20 +165,36 @@ if pergunta:
                 if foto_enviada:
                     dados_chat.append({"role": "user", "content": f"Analise visualmente a imagem anexada ({foto_enviada.name}). O usuário perguntou: {pergunta}"})
 
-                # Envia de forma blindada (POST) para não bugar o link com textos longos ou símbolos
-                resposta_api = requests.post(
-                    "https://pollinations.ai",
-                    json={"messages": dados_chat, "model": "openai"}
-                )
-                
-                if resposta_api.status_code == 200:
-                    texto_final = resposta_api.text
+                # Envia de forma blindada (POST) com timeout e tratamento de erro
+                try:
+                    resposta_api = requests.post(
+                        "https://pollinations.ai",
+                        json={"messages": dados_chat, "model": "openai"},
+                        timeout=20
+                    )
+                    if resposta_api.status_code == 200:
+                        texto_final = resposta_api.text
+                        placeholder.empty()
+                        st.write(texto_final)
+                        st.snow()  # Efeito de neve para deixar mais divertido! ❄️
+                        st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
+                        guardar_conversa()
+                    else:
+                        detalhe = resposta_api.text[:400]
+                        placeholder.write(f"❌ Erro do servidor ({resposta_api.status_code}): {detalhe}")
+                except requests.exceptions.Timeout:
+                    # Fallback local quando o servidor demora demais
+                    texto_final = f"Desculpe — o servidor demorou demais. Resposta rápida local: {pergunta}"
                     placeholder.empty()
                     st.write(texto_final)
-                    st.snow()  # Efeito de neve para deixar mais divertido! ❄️
                     st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
                     guardar_conversa()
-                else:
-                    placeholder.write("❌ O servidor do Gemini demorou para responder. Pode tentar mandar de novo?")
+                except Exception as e:
+                    # Fallback local em caso de erro de conexão
+                    texto_final = f"Desculpe — não foi possível conectar ao servidor ({e}). Resposta local: {pergunta}"
+                    placeholder.empty()
+                    st.write(texto_final)
+                    st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
+                    guardar_conversa()
             except Exception as e:
                 placeholder.write(f"❌ Erro de conexão: {e}")
