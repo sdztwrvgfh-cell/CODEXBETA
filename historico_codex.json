@@ -1,0 +1,12 @@
+[
+    {
+        "role": "user",
+        "type": "text",
+        "content": "desenhe um leopardo"
+    },
+    {
+        "role": "assistant",
+        "type": "text",
+        "content": "🖼️ Imagem gerada: https://image.pollinations.ai/prompt/leopardo?width=1024&height=1024&model=flux"
+    }
+]
