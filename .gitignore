@@ -1,0 +1,5 @@
+.streamlit/
+historico_codex.json
+__pycache__/
+*.pyc
+.env
