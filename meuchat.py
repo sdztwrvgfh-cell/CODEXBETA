@@ -11,11 +11,44 @@ def adicionar_recursos_extras():
         "Style.IA (still in test. BETA)",
         ["Realista", "Cartoon", "Anime", "Cyberpunk", "Frutiger aero style", "Pintura a óleo", "Aquarela", "Surrealista", "Pixel art"]
     )
-    audio = st.audio_input("Fale algo para o Codex responder na função de Áudio Inteligente:")
+    # Uploader de áudio para teste (mp3/wav). Substitui o inexistente `st.audio_input`.
+    audio = st.sidebar.file_uploader("Envie áudio para o Codex (mp3/wav)", type=["mp3", "wav"])
+    if audio:
+        try:
+            st.sidebar.audio(audio)
+        except Exception:
+            pass
+
     return temperatura, estilo, audio
 
 # ativa os controles extras do sidebar (slider / estilo / audio)
 temperatura, estilo, audio = adicionar_recursos_extras()
+
+
+def send_openai_chat(dados_chat, temperatura=0.7):
+    """Envia `dados_chat` para a API OpenAI Chat e retorna o texto gerado.
+    Lê a chave em OPENAI_API_KEY (variável de ambiente) ou em st.secrets.
+    """
+    api_key = os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
+    if not api_key:
+        raise RuntimeError("Defina a variavel ambiente OPENAI_API_KEY antes de executar.")
+
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "gpt-3.5-turbo",
+        "messages": dados_chat,
+        "temperature": float(temperatura),
+        "max_tokens": 800
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    # extrai texto da primeira escolha
+    return data["choices"][0]["message"]["content"]
 
 # Nome do arquivo que vai guardar as conversas no seu PC
 ARQUIVO_SALVO = "historico_codex.json"
@@ -23,12 +56,27 @@ NOTAS_ATUALIZACAO = "Notas da atualização: agora Codex mostra 'pensando...' po
 
 # --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="Codex.AI", page_icon="🚀", layout="centered")
+api_key = os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
+if not api_key:
+    st.warning("Defina a variavel ambiente OPENAI_API_KEY antes de executar.")
 
 # --- MENU LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.image("https://gstatic.com", width=60)
     st.title("🤖 Codex.AI")
     st.caption("Codex: Uma IA incrivel para conversas do dia a dia, gerar imagens e se divertir!🚀")
+    # Instruções rápidas para guardar a chave de forma segura
+    with st.expander("Como salvar a chave de forma segura (recomendado)"):
+        st.write("Para rodar localmente, cada pessoa precisa da própria chave OpenAI.")
+        st.markdown("**1)** Defina a variável de ambiente `OPENAI_API_KEY` no seu terminal (PowerShell).")
+        st.code('$env:OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"', language='powershell')
+        st.markdown("**2)** Crie um arquivo local `.streamlit/secrets.toml` (não commitá-lo).")
+        st.code('''mkdir .streamlit -Force
+@"
+OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"
+"@ > .streamlit/secrets.toml''', language='powershell')
+        st.markdown("**3)** Se você publicar no Streamlit Cloud, configure `OPENAI_API_KEY` nos Secrets do app.")
+        st.write("O app não mostra mais um campo de chave temporária; isso evita risco de vazar o token.")
     st.markdown("---")
     tema = st.selectbox("Tema do Site", ["Escuro", "White"])
     st.subheader("📊 Ficha Técnica")
@@ -165,23 +213,16 @@ if pergunta:
                 if foto_enviada:
                     dados_chat.append({"role": "user", "content": f"Analise visualmente a imagem anexada ({foto_enviada.name}). O usuário perguntou: {pergunta}"})
 
-                # Envia de forma blindada (POST) com timeout e tratamento de erro
+                # Envia usando OpenAI Chat (leitura da chave em OPENAI_API_KEY)
                 try:
-                    resposta_api = requests.post(
-                        "https://pollinations.ai",
-                        json={"messages": dados_chat, "model": "openai"},
-                        timeout=20
-                    )
-                    if resposta_api.status_code == 200:
-                        texto_final = resposta_api.text
-                        placeholder.empty()
-                        st.write(texto_final)
-                        st.snow()  # Efeito de neve para deixar mais divertido! ❄️
-                        st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
-                        guardar_conversa()
-                    else:
-                        detalhe = resposta_api.text[:400]
-                        placeholder.write(f"❌ Erro do servidor ({resposta_api.status_code}): {detalhe}")
+                    texto_final = send_openai_chat(dados_chat, temperatura=temperatura)
+                    placeholder.empty()
+                    st.write(texto_final)
+                    st.snow()
+                    st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
+                    guardar_conversa()
+                except RuntimeError as e:
+                    placeholder.write(f"❌ {e}")
                 except requests.exceptions.Timeout:
                     # Fallback local quando o servidor demora demais
                     texto_final = f"Desculpe — o servidor demorou demais. Resposta rápida local: {pergunta}"
@@ -189,6 +230,10 @@ if pergunta:
                     st.write(texto_final)
                     st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": texto_final})
                     guardar_conversa()
+                except requests.exceptions.HTTPError as e:
+                    resp = getattr(e, 'response', None)
+                    detalhe = resp.text[:400] if resp is not None else str(e)
+                    placeholder.write(f"❌ Erro HTTP: {detalhe}")
                 except Exception as e:
                     # Fallback local em caso de erro de conexão
                     texto_final = f"Desculpe — não foi possível conectar ao servidor ({e}). Resposta local: {pergunta}"
