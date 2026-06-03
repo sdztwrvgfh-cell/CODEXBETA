@@ -109,10 +109,10 @@ def send_openai_chat(dados_chat, temperatura=0.7):
 
 # Nome do arquivo que vai guardar as conversas no seu PC
 ARQUIVO_SALVO = "historico_codex.json"
-NOTAS_ATUALIZACAO = "Notas da atualização: agora Codex mostra 'pensando...' por 2s antes de responder e gera imagens com prompt melhorado."
+NOTAS_ATUALIZACAO = "Notas da atualização:Codex AI esta de cara nova! bugs concertados, modelo melhorado para gpt e criação de imagens amplamente melhorada com o modelo Flux-Architecture. Agora o app tem um visual mais moderno, divertido e leve, com opções de tema claro/escuro e um modo festa do pijama super fofo! 🎉✨"
 
 # --- CONFIGURAÇÃO VISUAL ---
-st.set_page_config(page_title="Codex.AI", page_icon="🚀", layout="centered")
+st.set_page_config(page_title="Codex.AI", page_icon="🚀", layout="wide")
 api_key = os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
 if not api_key:
     st.warning("Defina a variavel ambiente OPENAI_API_KEY antes de executar.")
@@ -121,6 +121,8 @@ if not api_key:
 with st.sidebar:
     st.image("https://gstatic.com", width=60)
     st.title("🤖 Codex.AI")
+    # Mensagem editável pelo usuário — você pode mudar esse texto a qualquer hora
+    st.text_input("Mensagem da IA (edite e veja ao vivo)", value="", key="custom_message", placeholder="Escreva uma mensagem curta para o badge da IA")
     st.caption("Codex: Uma IA incrivel para conversas do dia a dia, gerar imagens e se divertir!🚀")
     with st.expander("💰 Estimativa de custo da API"):
         st.write("OpenAI `gpt-3.5-turbo` custa cerca de US$0,002 por 1000 tokens.")
@@ -132,56 +134,55 @@ with st.sidebar:
         st.write(f"Com US${budget_usd:.2f}, você tem aproximadamente {tokens:,} tokens.")
         st.write(f"Isso equivale a cerca de {mensagens:,} trocas de mensagem se cada conversa usar 200 tokens.")
         st.info("As imagens do app são geradas pelo Pollinations, então só o chat consome a quota da OpenAI. Áudio transcrito também consome tokens.")
-    # Instruções rápidas para guardar a chave de forma segura
-    with st.expander("Como salvar a chave de forma segura (recomendado)"):
-        st.write("Para rodar localmente, cada pessoa precisa da própria chave OpenAI.")
-        st.markdown("**1)** Defina a variável de ambiente `OPENAI_API_KEY` no seu terminal (PowerShell).")
-        st.code('$env:OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"', language='powershell')
-        st.markdown("**2)** Crie um arquivo local `.streamlit/secrets.toml` (não commitá-lo).")
-        st.code('''mkdir .streamlit -Force
-@"
-OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"
-"@ > .streamlit/secrets.toml''', language='powershell')
-        st.markdown("**3)** Se você publicar no Streamlit Cloud, configure `OPENAI_API_KEY` nos Secrets do app.")
-        st.write("O app não mostra mais um campo de chave temporária; isso evita risco de vazar o token.")
+    # Nota discreta: manual de segurança foi movido para o rodapé da página
+    st.markdown("🔒 Manual de segurança da API disponível no rodapé (clique para ver).")
     st.markdown("---")
-    tema = st.selectbox("Tema do Site", ["Escuro", "White"])
-    modo_pijama = st.checkbox("🎉 Festa do pijama☁️", value=False)
-    st.subheader("📊 Ficha Técnica")
-    st.markdown("* **Modelo de Texto/Visão:** Gemini-2.5-Flash\n* **Modelo de Imagem:** Flux-Architecture")
+    with st.expander("Controles", expanded=True):
+        tema = st.selectbox("Tema do Site", ["Escuro", "White"], key="tema")
+        modo_pijama = st.checkbox("🎉 Festa do pijama☁️", value=False, key="modo_pijama")
+        estilo_divertido = st.selectbox(
+            "Modo divertido",
+            ["Normal", "Futurista", "Anime", "Retrô"],
+            key="estilo_divertido"
+        )
+        st.subheader("📊 Ficha Técnica")
+        st.markdown("* **Modelo de Texto/Visão:** Gemini-2.5-Flash\n* **Modelo de Imagem:** Flux-Architecture")
 
-    estilo_divertido = st.selectbox(
-        "Modo divertido",
-        ["Normal", "Futurista", "Anime", "Retrô"]
-    )
+        if modo_pijama:
+            st.markdown("<div class='pijama-banner'>🎀 <strong>Modo Festa do Pijama ativado!</strong> Tudo fica mais macio, divertido e com nuvens.</div>", unsafe_allow_html=True)
+            if not st.session_state.get("pijama_balloons", False):
+                st.balloons()
+                st.session_state.pijama_balloons = True
+            st.info("✨ Está tudo temático: nuvens, travesseiros e emojis suaves estão liberados.")
+            if st.button("📖 Conta uma história de pijama"):
+                st.session_state.pijama_story_request = True
 
-    if modo_pijama:
-        st.markdown("<div style='padding: 14px; border-radius: 18px; background: rgba(255,255,255,0.18); border: 1px dashed #d8b4fe; color: #2b1532;'>🎀 <strong>Modo Festa do Pijama ativado!</strong> Tudo fica mais macio, divertido e com nuvens. Peça uma história, um desenho fofo ou uma dica de travesseiro.</div>", unsafe_allow_html=True)
-        if not st.session_state.get("pijama_balloons", False):
-            st.balloons()
-            st.session_state.pijama_balloons = True
-        st.info("✨ Está tudo temático: nuvens, travesseiros e emojis suaves estão liberados.")
-        if st.button("📖 Conta uma história de pijama"):
-            st.session_state.pijama_story_request = True
+        if st.button("🎲 IDEIAS"):
+            st.session_state.ultima_ideia = "desenhe um gato robô voando sobre uma cidade neon"
+        
+        if st.button("🔊 Som ambiente"):
+            st.audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_9c8b1e5a7b.mp3?filename=relaxing-ambient-music-11290.mp3", loop=True)
 
-    if st.button("🎲 IDEIAS"):
-        st.session_state.ultima_ideia = "desenhe um gato robô voando sobre uma cidade neon"
+            if st.button("recomendar promptS para testar a IA"):
+                st.session_state.ultima_ideia = "Crie uma imagem de um cachorro astronauta explorando a lua, com um estilo de pintura a óleo e muitos detalhes fofos! 🚀🐶🌕"
 
-    if "ultima_ideia" in st.session_state:
-        st.info(f"💡 Experimente: {st.session_state.ultima_ideia}")
+        if st.button("🔄 Resetar layout"):
+            st.session_state.tema = "Escuro"
+            st.session_state.modo_pijama = False
+            st.session_state.estilo_divertido = "Normal"
+            st.experimental_rerun()
 
-    tema_escuro = st.checkbox("Tema Blackout", value=True)
+        if "ultima_ideia" in st.session_state:
+            st.info(f"💡 Experimente: {st.session_state.ultima_ideia}")
+
+        st.markdown("---")
+        if st.button("🗑️ Limpar Conversa Salva"):
+            if os.path.exists(ARQUIVO_SALVO):
+                os.remove(ARQUIVO_SALVO)
+            st.session_state.historico_codex = []
+            st.experimental_rerun()
 
     st.write("DICA: Vc ja testou os truques da IA? peça para ela desenhar um gato astronauta na lua ou analisar uma foto sua junto com uma pergunta! 🚀")
-
-    st.markdown("---")
-    
-    # Botão caso você queira apagar o histórico e começar do zero
-    if st.button("🗑️ Limpar Conversa Salva"):
-        if os.path.exists(ARQUIVO_SALVO):
-            os.remove(ARQUIVO_SALVO)
-        st.session_state.historico_codex = []
-        st.rerun()
 
 if tema == "White":
     fundo = "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #dbeafe 100%)"
@@ -222,19 +223,53 @@ if 'modo_pijama' in locals() and modo_pijama:
 
 st.markdown(f"""
     <style>
-    .stApp {{ background: {fundo}; }}
-    div[data-testid="stSidebar"], .stChatMessage, div[data-testid="stFileUploader"] {{
-        background: {painel} !important;
-        backdrop-filter: blur(12px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 16px !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+    :root {{ --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(255,255,255,0.25); --accent: rgba(125,58,242,0.92); }}
+    .stApp {{ background: {fundo} !important; }}
+    .block-container {{ max-width: 1200px; padding: 28px 38px !important; margin: 0 auto; }}
+    div[data-testid="stSidebar"] {{ min-width: 260px !important; max-width: 340px !important; background: rgba(15, 15, 30, 0.40) !important; }}
+    div[data-testid="stSidebar"], .stChatMessage, div[data-testid="stFileUploader"], .stBlock {{
+        background: rgba(255,255,255,0.08) !important;
+        backdrop-filter: blur(18px) saturate(140%) !important;
+        -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+        border: 1px solid rgba(255,255,255,0.22) !important;
+        border-radius: 18px !important;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.16) !important;
+        color: {texto} !important;
     }}
-    h1, h2, h3, p, span, label {{ color: {texto} !important; font-family: 'Inter', sans-serif; }}
+    .stSidebar .stButton > button, .stBlock .stButton > button {{
+        background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
+        border: 1px solid rgba(255,255,255,0.18);
+        color: {texto} !important;
+        padding: 10px 16px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 28px rgba(88, 30, 140, 0.12) !important;
+    }}
+    .stChatMessage {{ border-radius: 24px !important; padding: 18px !important; margin-bottom:18px !important; max-width: 980px; transition: transform 0.22s ease, box-shadow 0.22s ease; }}
+    .stChatMessage:hover {{ transform: translateY(-6px); box-shadow: 0 24px 52px rgba(0,0,0,0.18) !important; }}
+    .stButton > button {{ transition: transform 0.18s ease, box-shadow 0.18s ease; }}
+    .stButton > button:hover {{ transform: translateY(-2px); box-shadow: 0 16px 36px rgba(88, 30, 140, 0.18) !important; }}
+    .stButton > button:active {{ transform: scale(0.97); }}
+    .ai-badge {{ display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 18px; background: linear-gradient(120deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)); border: 1px solid rgba(255,255,255,0.20); color: {texto}; box-shadow: 0 10px 28px rgba(88, 30, 140, 0.08); font-weight:700; margin-bottom: 12px; }}
+    .icon-gem {{ width:22px; height:22px; filter: drop-shadow(0 4px 12px rgba(125,58,242,0.18)); }}
+    .pijama-cloud {{ position: fixed; opacity: 0.95; pointer-events:none; z-index:1; filter: blur(0.6px); }}
+    .pijama-banner {{ padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.18); border: 1px dashed rgba(216, 180, 254, 0.95); color: #2b1532; margin-bottom: 18px; box-shadow: 0 10px 24px rgba(255,255,255,0.18); }}
+    .stApp {{ overflow-x: hidden; background-size: 200% 200% !important; animation: gradientShift 18s ease infinite; }}
+    @keyframes gradientShift {{
+        0% {{ background-position: 0% 50%; }}
+        50% {{ background-position: 100% 50%; }}
+        100% {{ background-position: 0% 50%; }}
+    }}
     {extra_css}
     </style>
     {extra_html}
 """, unsafe_allow_html=True)
+
+# Manual de segurança no rodapé (discreto)
+with st.expander("🔒 Manual de segurança da API (local)", expanded=False):
+    st.write("Para rodar localmente, defina a variável de ambiente `OPENAI_API_KEY` ou crie `.streamlit/secrets.toml` e não o comite.")
+    st.code('$env:OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"', language='powershell')
+    st.write("Exemplo mínimo de `.streamlit/secrets.toml`:")
+    st.code('OPENAI_API_KEY = "sk-SUA_CHAVE_AQUI"', language='toml')
 
 # --- SISTEMA DE MEMÓRIA (CARREGAR E SALVAR) ---
 if "historico_codex" not in st.session_state:
@@ -261,6 +296,10 @@ def guardar_conversa():
 
 # --- CORPO PRINCIPAL DO CHAT ---
 st.title("🚀 Codex.AI BETA VERSION")
+# Mostra a mensagem editável definida no sidebar (você pode alterar ao vivo)
+custom_msg = st.session_state.get("custom_message", "")
+if custom_msg:
+    st.markdown(f"<div class='ai-badge'><svg class='icon-gem' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg' style='width:20px;height:20px;vertical-align:middle;margin-right:8px;fill: #7d3af2;'> <path d='M12 2l3 5 5 1-3.5 4 1 5-5-2-5 2 1-5L4 8l5-1z'/> </svg>{custom_msg}</div>", unsafe_allow_html=True)
 if 'modo_pijama' in locals() and modo_pijama:
     st.markdown("### 🌙 Bem-vindo à Festa do Pijama ☁️\nVamos conversar como se estivéssemos em uma noite de travesseiros e nuvens.")
 st.caption("Modelos usados: Gemini-2.5-Flash para conversa e Flux-Architecture para imagem")
@@ -340,8 +379,8 @@ if pergunta:
         # 🧠 MODO CONVERSA E VISÃO (Gemini-2.5-Flash Sem Bug de URL)
         else:
             with st.spinner("🔎 Codex está analisando..."):
-                time.sleep(1)  # Simula o "pensando..." por 1 segundos
-                placeholder.write("DICA: Vc pode pedir para o Codex 'desenhar imagens!' ou 'analisar uma foto' junto com seu texto! 🚀")
+                time.sleep(2)  # Simula o "pensando..." por 2 segundos
+                placeholder.write("🚀CODEX.IA esta trabalhando na melhor resposta!")
                 try:
                     contexto_sistema = "Você é o Codex.AI, uma inteligência artificial criada por mim (pedro) incrível e descontraída rodando o modelo Gemini-2.5-Flash. Use bastantes emojis nas respostas e aja um pouco louca para ser mais divertido! Responda de forma clara, criativa e com uma pitada de humor. Se o usuário enviar uma foto, analise visualmente e responda considerando o conteúdo da imagem junto com a pergunta. Seja breve, objetivo e use muitos emojis para deixar a conversa leve e divertida!"
                     
