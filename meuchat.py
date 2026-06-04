@@ -1,10 +1,13 @@
 import streamlit as st
 import requests
+import traceback
 from io import BytesIO
 from PIL import Image
+from urllib.parse import quote
 import json
 import os
 import time
+import random
 
 API_COST_PER_1000_TOKENS = 0.002
 DEFAULT_BILLING_DOLLARS = 5.0
@@ -117,6 +120,34 @@ api_key = os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") 
 if not api_key:
     st.warning("Defina a variavel ambiente OPENAI_API_KEY antes de executar.")
 
+# --- INICIALIZAÇÃO DE ESTADO ---
+if "historico_codex" not in st.session_state:
+    if os.path.exists(ARQUIVO_SALVO):
+        with open(ARQUIVO_SALVO, "r", encoding="utf-8") as f:
+            st.session_state.historico_codex = json.load(f)
+    else:
+        st.session_state.historico_codex = []
+if "audio_transcricao" not in st.session_state:
+    st.session_state.audio_transcricao = ""
+if "audio_status" not in st.session_state:
+    st.session_state.audio_status = ""
+if "enviar_audio_transcrito" not in st.session_state:
+    st.session_state.enviar_audio_transcrito = False
+if "modo_neon" not in st.session_state:
+    st.session_state.modo_neon = False
+if "wallpaper_url" not in st.session_state:
+    st.session_state.wallpaper_url = ""
+if "paleta_preset" not in st.session_state:
+    st.session_state.paleta_preset = "Padrão"
+if "custom_message" not in st.session_state:
+    st.session_state.custom_message = ""
+if "tema" not in st.session_state:
+    st.session_state.tema = "Escuro"
+if "modo_pijama" not in st.session_state:
+    st.session_state.modo_pijama = False
+if "estilo_divertido" not in st.session_state:
+    st.session_state.estilo_divertido = "Normal"
+
 # --- MENU LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.image("https://gstatic.com", width=60)
@@ -156,15 +187,19 @@ with st.sidebar:
         }
         paleta = st.selectbox("Paleta rápida", list(paletas.keys()), index=0, key="paleta_preset")
         if st.button("Aplicar Paleta"):
-            escolha = st.session_state.get("paleta_preset")
-            dados = paletas.get(escolha, paletas["Padrão"])
-            # atualiza acento e (opcional) papel de parede via campo wallpaper_url
-            st.session_state.modo_neon = (escolha == "Neon")
-            # atualiza diretamente o campo de URL (você pode deixá-lo vazio para não alterar)
-            if dados["wall"]:
-                st.session_state.wallpaper_url = dados["wall"]
-            # força recarregar para aplicar mudanças no CSS/fundo
-            st.experimental_rerun()
+            try:
+                escolha = st.session_state.get("paleta_preset")
+                dados = paletas.get(escolha, paletas["Padrão"])
+                # atualiza acento e (opcional) papel de parede via campo wallpaper_url
+                st.session_state.modo_neon = (escolha == "Neon")
+                # atualiza diretamente o campo de URL (você pode deixá-lo vazio para não alterar)
+                if dados.get("wall"):
+                    st.session_state.wallpaper_url = dados["wall"]
+                # força recarregar para aplicar mudanças no CSS/fundo
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Erro ao aplicar paleta: {e}")
+                st.text(traceback.format_exc())
         st.subheader("📊 Ficha Técnica")
         st.markdown("* **Modelo de Texto/Visão:** Gemini-2.5-Flash\n* **Modelo de Imagem:** Flux-Architecture")
         
@@ -206,7 +241,7 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    total_msgs = len(st.session_state.historico_codex)
+    total_msgs = len(st.session_state.get("historico_codex", []))
     st.sidebar.metric("💬 Mensagens salvas", total_msgs)
 
     st.write("DICA: Vc ja testou os truques da IA? peça para ela desenhar um gato astronauta na lua ou analisar uma foto sua junto com uma pergunta! 🚀")
@@ -401,9 +436,9 @@ if pergunta:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         
-        # 🎨 MODO CRIAÇÃO DE IMAGENS (Flux)
+        # 🎨 MODO CRIAÇÃO DE IMAGENS (Stable Diffusion via Hugging Face)
         if any(termo in pergunta.lower() for termo in ["crie", "desenhe", "imagem", "foto de"]):
-            placeholder.write("🎨 Conectando ao motor Flux... Criando sua arte! 🚀")
+            placeholder.write("🎨 Gerando sua imagem com Stable Diffusion... 🚀")
             try:
                 texto_limpo = pergunta.lower()
                 for termo in [
@@ -411,19 +446,84 @@ if pergunta:
                     "desenhe um", "desenhe uma", "desenhe o", "desenhe a", "desenhe", "faça uma foto de um", "faça um", "faça uma foto de", "faca uma foto de", "foto de um", "foto de uma", "foto do", "foto da", "foto de"
                 ]:
                     texto_limpo = texto_limpo.replace(termo, "")
-                texto_limpo = texto_limpo.strip().replace(" ", "%20")
-                
-                url_gerador = f"https://image.pollinations.ai/prompt/{texto_limpo}?width=1024&height=1024&model=flux"
-                
+                texto_limpo = texto_limpo.strip()
+
                 placeholder.empty()
-                st.write(f"🖼️ Aqui está sua imagem para: **{texto_limpo.replace('%20', ' ')}**")
+                st.write(f"🖼️ IMAGEM EM PROCESSO: **{texto_limpo}**")
+
+                # Primeiro tenta Hugging Face Inference API
+                fallback_openai = False
                 try:
-                    st.image(url_gerador, use_container_width=True)
-                except Exception as img_error:
-                    st.warning(f"⚠️ Imagem pode estar indisponível (tente novamente em alguns segundos). Erro: {img_error}")
-                    st.markdown(f"[Ver imagem diretamente]({url_gerador})")
-                st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": f"🖼️ Imagem gerada: {url_gerador}"})
-                guardar_conversa()
+                    hf_api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+                    headers_hf = {"Content-Type": "application/json"}
+                    payload_hf = {"inputs": texto_limpo}
+                    
+                    r_hf = requests.post(hf_api_url, headers=headers_hf, json=payload_hf, timeout=120)
+                    
+                    if r_hf.status_code == 200:
+                        st.image(BytesIO(r_hf.content), use_container_width=True)
+                        st.success("✅ Imagem gerada via Stable Diffusion 2.1")
+                        st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": f"🖼️ Imagem gerada: {texto_limpo}"})
+                        guardar_conversa()
+                    elif r_hf.status_code == 503:
+                        st.warning("⏳ Modelo está carregando, tentando novamente...")
+                        time.sleep(3)
+                        r_hf = requests.post(hf_api_url, headers=headers_hf, json=payload_hf, timeout=120)
+                        if r_hf.status_code == 200:
+                            st.image(BytesIO(r_hf.content), use_container_width=True)
+                            st.success("✅ Imagem gerada via Stable Diffusion 2.1")
+                            st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": f"🖼️ Imagem gerada: {texto_limpo}"})
+                            guardar_conversa()
+                        else:
+                            st.warning("Servidor ainda carregando. Tente novamente em alguns segundos.")
+                    else:
+                        fallback_openai = True
+                except requests.exceptions.Timeout:
+                    st.warning("⏱️ Geração de imagem demorou muito. Tentando fallback com OpenAI...")
+                    fallback_openai = True
+                except Exception as he:
+                    st.warning(f"⚠️ Hugging Face não pôde ser acessado: {he}")
+                    fallback_openai = True
+
+                if fallback_openai:
+                    api_key_local = os.environ.get("OPENAI_API_KEY") or (st.secrets.get("OPENAI_API_KEY") if hasattr(st, "secrets") else None)
+                    if not api_key_local:
+                        st.error("❌ Não foi possível usar Hugging Face e não há chave OpenAI disponível para fallback.")
+                    else:
+                        try:
+                            headers_o = {"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"}
+                            payload_img = {"model": "gpt-image-1", "prompt": texto_limpo, "size": "1024x1024"}
+                            r_img = requests.post("https://api.openai.com/v1/images/generations", headers=headers_o, json=payload_img, timeout=60)
+                            r_img.raise_for_status()
+                            data_img = r_img.json()
+                            url_out = None
+                            if isinstance(data_img, dict) and data_img.get("data") and len(data_img["data"]) > 0:
+                                first = data_img["data"][0]
+                                url_out = first.get("url") or first.get("b64_json")
+                            if url_out:
+                                if isinstance(url_out, str) and url_out.startswith("http"):
+                                    r_final = requests.get(url_out, timeout=20)
+                                    r_final.raise_for_status()
+                                    st.image(BytesIO(r_final.content), use_container_width=True)
+                                else:
+                                    import base64
+                                    st.image(BytesIO(base64.b64decode(url_out)), use_container_width=True)
+                                st.success("✅ Imagem gerada via OpenAI")
+                                st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": f"🖼️ Imagem gerada: {texto_limpo}"})
+                                guardar_conversa()
+                            else:
+                                st.error("❌ Não foi possível obter URL da imagem do OpenAI.")
+                        except requests.exceptions.HTTPError as he:
+                            if he.response.status_code == 429:
+                                st.warning("⏱️ Rate limit atingido. Aguarde e tente novamente.")
+                            elif he.response.status_code == 401:
+                                st.error("❌ Chave OpenAI inválida ou expirada.")
+                            else:
+                                st.error(f"❌ Erro HTTP OpenAI {he.response.status_code}: {he.response.text[:300]}")
+                        except requests.exceptions.Timeout:
+                            st.warning("⏱️ Fallback OpenAI demorou muito. Tente novamente com um prompt mais simples.")
+                        except Exception as oe:
+                            st.error(f"❌ Erro ao gerar imagem via OpenAI: {oe}")
             except Exception as e:
                 placeholder.write(f"❌ Erro na imagem: {e}")
                 st.info("💡 Dica: Tente descrever a imagem de forma mais simples. Ex: 'desenhe um gato amarelo'")
