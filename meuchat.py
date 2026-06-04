@@ -146,25 +146,25 @@ with st.sidebar:
             key="estilo_divertido"
         )
         modo_neon = st.checkbox("Modo Neon (vibes 2000)", value=False, key="modo_neon")
-        wallpaper_url = st.text_input("https://i.pinimg.com/736x/aa/ed/e9/aaede9ac461d3bd6d80832a55282a33b.jpg", value="", key="wallpaper_url", placeholder="https://...jpg")
-                # Snippet: Aplicar Paleta — cole dentro de `with st.sidebar:` (próximo ao wallpaper_url)
-                paletas = {
-                    "Padrão": {"accent": "#7d3af2", "wall": ""}, 
-                    "Neon":   {"accent": "#00f5ff", "wall": ""}, 
-                    "Cyber":  {"accent": "#39ff14", "wall": ""}, 
-                    "Pastel": {"accent": "#ff78c6", "wall": ""}
-                }
-                paleta = st.selectbox("Paleta rápida", list(paletas.keys()), index=0, key="paleta_preset")
-                if st.button("Aplicar Paleta"):
-                    escolha = st.session_state.get("paleta_preset")
-                    dados = paletas.get(escolha, paletas["Padrão"])
-                    # atualiza acento e (opcional) papel de parede via campo wallpaper_url
-                    st.session_state.modo_neon = (escolha == "Neon")
-                    # atualiza diretamente o campo de URL (você pode deixá-lo vazio para não alterar)
-                    if dados["wall"]:
-                        st.session_state.wallpaper_url = dados["wall"]
-                    # força recarregar para aplicar mudanças no CSS/fundo
-                    st.experimental_rerun()
+        wallpaper_url = st.text_input("URL do papel de parede (opcional)", value="https://i.pinimg.com/736x/aa/ed/e9/aaede9ac461d3bd6d80832a55282a33b.jpg", key="wallpaper_url", placeholder="https://...jpg")
+        # Snippet: Aplicar Paleta — cole dentro de `with st.sidebar:` (próximo ao wallpaper_url)
+        paletas = {
+            "Padrão": {"accent": "#7d3af2", "wall": ""}, 
+            "Neon":   {"accent": "#00f5ff", "wall": ""}, 
+            "Cyber":  {"accent": "#39ff14", "wall": ""}, 
+            "Pastel": {"accent": "#ff78c6", "wall": ""}
+        }
+        paleta = st.selectbox("Paleta rápida", list(paletas.keys()), index=0, key="paleta_preset")
+        if st.button("Aplicar Paleta"):
+            escolha = st.session_state.get("paleta_preset")
+            dados = paletas.get(escolha, paletas["Padrão"])
+            # atualiza acento e (opcional) papel de parede via campo wallpaper_url
+            st.session_state.modo_neon = (escolha == "Neon")
+            # atualiza diretamente o campo de URL (você pode deixá-lo vazio para não alterar)
+            if dados["wall"]:
+                st.session_state.wallpaper_url = dados["wall"]
+            # força recarregar para aplicar mudanças no CSS/fundo
+            st.experimental_rerun()
         st.subheader("📊 Ficha Técnica")
         st.markdown("* **Modelo de Texto/Visão:** Gemini-2.5-Flash\n* **Modelo de Imagem:** Flux-Architecture")
         
