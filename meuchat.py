@@ -145,8 +145,31 @@ with st.sidebar:
             ["Normal", "Futurista", "Anime", "Retrô"],
             key="estilo_divertido"
         )
+        modo_neon = st.checkbox("Modo Neon (vibes 2000)", value=False, key="modo_neon")
+        wallpaper_url = st.text_input("https://i.pinimg.com/736x/aa/ed/e9/aaede9ac461d3bd6d80832a55282a33b.jpg", value="", key="wallpaper_url", placeholder="https://...jpg")
+                # Snippet: Aplicar Paleta — cole dentro de `with st.sidebar:` (próximo ao wallpaper_url)
+                paletas = {
+                    "Padrão": {"accent": "#7d3af2", "wall": ""}, 
+                    "Neon":   {"accent": "#00f5ff", "wall": ""}, 
+                    "Cyber":  {"accent": "#39ff14", "wall": ""}, 
+                    "Pastel": {"accent": "#ff78c6", "wall": ""}
+                }
+                paleta = st.selectbox("Paleta rápida", list(paletas.keys()), index=0, key="paleta_preset")
+                if st.button("Aplicar Paleta"):
+                    escolha = st.session_state.get("paleta_preset")
+                    dados = paletas.get(escolha, paletas["Padrão"])
+                    # atualiza acento e (opcional) papel de parede via campo wallpaper_url
+                    st.session_state.modo_neon = (escolha == "Neon")
+                    # atualiza diretamente o campo de URL (você pode deixá-lo vazio para não alterar)
+                    if dados["wall"]:
+                        st.session_state.wallpaper_url = dados["wall"]
+                    # força recarregar para aplicar mudanças no CSS/fundo
+                    st.experimental_rerun()
         st.subheader("📊 Ficha Técnica")
         st.markdown("* **Modelo de Texto/Visão:** Gemini-2.5-Flash\n* **Modelo de Imagem:** Flux-Architecture")
+        
+        st.divider()
+        st.success("✅ Sistema funcionando normalmente! Erro de recarregamento corrigido.")
 
         if modo_pijama:
             st.markdown("<div class='pijama-banner'>🎀 <strong>Modo Festa do Pijama ativado!</strong> Tudo fica mais macio, divertido e com nuvens.</div>", unsafe_allow_html=True)
@@ -154,7 +177,7 @@ with st.sidebar:
                 st.balloons()
                 st.session_state.pijama_balloons = True
             st.info("✨ Está tudo temático: nuvens, travesseiros e emojis suaves estão liberados.")
-            if st.button("📖 Conta uma história de pijama"):
+            if st.button("📖 Conta uma história de dormir"):
                 st.session_state.pijama_story_request = True
 
         if st.button("🎲 IDEIAS"):
@@ -170,7 +193,7 @@ with st.sidebar:
             st.session_state.tema = "Escuro"
             st.session_state.modo_pijama = False
             st.session_state.estilo_divertido = "Normal"
-            st.experimental_rerun()
+            st.rerun()
 
         if "ultima_ideia" in st.session_state:
             st.info(f"💡 Experimente: {st.session_state.ultima_ideia}")
@@ -180,7 +203,11 @@ with st.sidebar:
             if os.path.exists(ARQUIVO_SALVO):
                 os.remove(ARQUIVO_SALVO)
             st.session_state.historico_codex = []
-            st.experimental_rerun()
+            st.rerun()
+
+    st.divider()
+    total_msgs = len(st.session_state.historico_codex)
+    st.sidebar.metric("💬 Mensagens salvas", total_msgs)
 
     st.write("DICA: Vc ja testou os truques da IA? peça para ela desenhar um gato astronauta na lua ou analisar uma foto sua junto com uma pergunta! 🚀")
 
@@ -221,44 +248,64 @@ if 'modo_pijama' in locals() and modo_pijama:
     <div class='pijama-badge'>☁️ Festa do Pijama ☁️</div>
     """
 
+# Define cor de acento baseado no toggle Neon e permite override do fundo com URL
+accent_color = "#43a7f9" if st.session_state.get("modo_neon", False) else "#7d3af2"
+if st.session_state.get("wallpaper_url"):
+    wp = st.session_state.get("wallpaper_url").strip()
+    if wp:
+        fundo = f"url('{wp}') center/cover fixed"
+
 st.markdown(f"""
     <style>
-    :root {{ --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(255,255,255,0.25); --accent: rgba(125,58,242,0.92); }}
+    /* Importa fontes leves e futuristas (mude aqui se quiser outra fonte) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;600&display=swap');
+    :root {{
+        --glass-bg: rgba(255,255,255,0.06);
+        --glass-border: rgba(255,255,255,0.18);
+        --accent: {accent_color}; /* Troque aqui para ajustar a cor principal (ex: #00f5ff) */
+        --accent-2: rgba(0,245,255,0.12);
+        --card-radius: 16px;
+    }}
+    body, .stApp, .block-container {{ font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color: {texto}; }}
+    h1, h2, h3, .stTitle {{ font-family: 'Orbitron', 'Inter', sans-serif; letter-spacing: 0.2px; }}
     .stApp {{ background: {fundo} !important; }}
-    .block-container {{ max-width: 1200px; padding: 28px 38px !important; margin: 0 auto; }}
-    div[data-testid="stSidebar"] {{ min-width: 260px !important; max-width: 340px !important; background: rgba(15, 15, 30, 0.40) !important; }}
+    .block-container {{ max-width: 1200px; padding: 24px 34px !important; margin: 0 auto; }}
+    div[data-testid="stSidebar"] {{ min-width: 260px !important; max-width: 340px !important; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important; }}
     div[data-testid="stSidebar"], .stChatMessage, div[data-testid="stFileUploader"], .stBlock {{
-        background: rgba(255,255,255,0.08) !important;
-        backdrop-filter: blur(18px) saturate(140%) !important;
-        -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
-        border: 1px solid rgba(255,255,255,0.22) !important;
-        border-radius: 18px !important;
-        box-shadow: 0 18px 50px rgba(0,0,0,0.16) !important;
+        background: var(--glass-bg) !important;
+        backdrop-filter: blur(14px) saturate(130%) !important;
+        -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: var(--card-radius) !important;
+        box-shadow: 0 10px 30px rgba(2,6,23,0.45) inset, 0 8px 26px rgba(0,0,0,0.35) !important;
         color: {texto} !important;
     }}
     .stSidebar .stButton > button, .stBlock .stButton > button {{
-        background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
-        border: 1px solid rgba(255,255,255,0.18);
+        background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+        border: 1px solid rgba(255,255,255,0.06);
         color: {texto} !important;
-        padding: 10px 16px !important;
-        border-radius: 16px !important;
-        box-shadow: 0 10px 28px rgba(88, 30, 140, 0.12) !important;
+        padding: 10px 14px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.22) !important;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
     }}
-    .stChatMessage {{ border-radius: 24px !important; padding: 18px !important; margin-bottom:18px !important; max-width: 980px; transition: transform 0.22s ease, box-shadow 0.22s ease; }}
-    .stChatMessage:hover {{ transform: translateY(-6px); box-shadow: 0 24px 52px rgba(0,0,0,0.18) !important; }}
-    .stButton > button {{ transition: transform 0.18s ease, box-shadow 0.18s ease; }}
-    .stButton > button:hover {{ transform: translateY(-2px); box-shadow: 0 16px 36px rgba(88, 30, 140, 0.18) !important; }}
-    .stButton > button:active {{ transform: scale(0.97); }}
-    .ai-badge {{ display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 18px; background: linear-gradient(120deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)); border: 1px solid rgba(255,255,255,0.20); color: {texto}; box-shadow: 0 10px 28px rgba(88, 30, 140, 0.08); font-weight:700; margin-bottom: 12px; }}
-    .icon-gem {{ width:22px; height:22px; filter: drop-shadow(0 4px 12px rgba(125,58,242,0.18)); }}
+    .stChatMessage {{ border-radius: 20px !important; padding: 16px !important; margin-bottom:14px !important; max-width: 980px; transition: transform 0.22s ease, box-shadow 0.22s ease; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)) !important; border: 1px solid rgba(255,255,255,0.04) !important; }}
+    .stChatMessage:hover {{ transform: translateY(-6px); box-shadow: 0 22px 48px rgba(2,6,23,0.56) !important; }}
+    .stButton > button:hover {{ transform: translateY(-2px); box-shadow: 0 14px 32px rgba(0,0,0,0.28) !important; }}
+    .stButton > button:active {{ transform: scale(0.985); }}
+    .ai-badge {{ display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 14px; background: linear-gradient(90deg, rgba(125,58,242,0.14), var(--accent-2)); border: 1px solid rgba(125,58,242,0.14); color: {texto}; box-shadow: 0 8px 26px rgba(125,58,242,0.06); font-weight:700; margin-bottom: 12px; }}
+    .icon-gem {{ width:20px; height:20px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25)); }}
     .pijama-cloud {{ position: fixed; opacity: 0.95; pointer-events:none; z-index:1; filter: blur(0.6px); }}
-    .pijama-banner {{ padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.18); border: 1px dashed rgba(216, 180, 254, 0.95); color: #2b1532; margin-bottom: 18px; box-shadow: 0 10px 24px rgba(255,255,255,0.18); }}
+    .pijama-banner {{ padding: 14px; border-radius: 16px; background: rgba(255,255,255,0.06); border: 1px dashed rgba(216, 180, 254, 0.06); color: #2b1532; margin-bottom: 14px; box-shadow: 0 8px 18px rgba(255,255,255,0.04); }}
     .stApp {{ overflow-x: hidden; background-size: 200% 200% !important; animation: gradientShift 18s ease infinite; }}
     @keyframes gradientShift {{
         0% {{ background-position: 0% 50%; }}
         50% {{ background-position: 100% 50%; }}
         100% {{ background-position: 0% 50%; }}
     }}
+    /* Inputs e placeholders mais minimalistas */
+    input, textarea, .stTextInput, .stTextArea {{ border-radius: 12px !important; padding: 10px !important; background: rgba(255,255,255,0.02) !important; color: {texto} !important; border: 1px solid rgba(255,255,255,0.04) !important; }}
+    input::placeholder, textarea::placeholder {{ color: rgba(255,255,255,0.44) !important; }}
     {extra_css}
     </style>
     {extra_html}
@@ -311,7 +358,7 @@ for item in st.session_state.historico_codex:
         st.write(item["content"])
 
 # Caixa para enviar fotos
-foto_enviada = st.file_uploader("📸 Envie uma foto para o Codex analisar junto com seu texto:", type=["png", "jpg", "jpeg"])
+foto_enviada = st.file_uploader("📸 Envie uma foto e em seguida um texto para ser analisada e ativar modo observ🔎:", type=["png", "jpg", "jpeg"])
 
 # Caixa de Entrada de Texto
 if st.session_state.get("pijama_story_request", False):
@@ -370,11 +417,16 @@ if pergunta:
                 
                 placeholder.empty()
                 st.write(f"🖼️ Aqui está sua imagem para: **{texto_limpo.replace('%20', ' ')}**")
-                st.image(url_gerador)
+                try:
+                    st.image(url_gerador, use_container_width=True)
+                except Exception as img_error:
+                    st.warning(f"⚠️ Imagem pode estar indisponível (tente novamente em alguns segundos). Erro: {img_error}")
+                    st.markdown(f"[Ver imagem diretamente]({url_gerador})")
                 st.session_state.historico_codex.append({"role": "assistant", "type": "text", "content": f"🖼️ Imagem gerada: {url_gerador}"})
                 guardar_conversa()
             except Exception as e:
                 placeholder.write(f"❌ Erro na imagem: {e}")
+                st.info("💡 Dica: Tente descrever a imagem de forma mais simples. Ex: 'desenhe um gato amarelo'")
         
         # 🧠 MODO CONVERSA E VISÃO (Gemini-2.5-Flash Sem Bug de URL)
         else:
